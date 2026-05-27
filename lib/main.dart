@@ -39,6 +39,31 @@ abstract final class RooSpacing {
   static const double xxl = 32;
 }
 
+/// Static corp list for fleet selection.
+abstract final class RooCorps {
+  static const List<String> names = [
+    'AECS',
+    'AXON',
+    'TBSW',
+    'TSAC',
+    'TSAB',
+    'TSB',
+  ];
+
+  static const String validationMessage = 'Please select corp';
+}
+
+/// Static trip list for fleet selection.
+abstract final class RooTrips {
+  static const List<String> names = [
+    'Pickup-8:30AM',
+    'Drop-12:30PM',
+    'Drop-4:30PM',
+  ];
+
+  static const String validationMessage = 'Please select trip';
+}
+
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
@@ -139,7 +164,15 @@ class RooLogo extends StatelessWidget {
         border: Border.all(color: RooColors.primary, width: borderWidth),
         color: Colors.white,
       ),
-      child: CustomPaint(painter: _RooLogoPainter()),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/roosuper_logo.png',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return CustomPaint(painter: _RooLogoPainter());
+          },
+        ),
+      ),
     );
   }
 }
@@ -359,12 +392,22 @@ class RooAppHeader extends StatelessWidget {
     this.showSearch = false,
     this.notificationDot = false,
     this.centerSelectors = false,
+    this.selectedCorp,
+    this.onCorpChanged,
+    this.selectedTrip,
+    this.onTripChanged,
+    this.selectorAutovalidateMode = AutovalidateMode.disabled,
   });
 
   final bool showTruckTitle;
   final bool showSearch;
   final bool notificationDot;
   final bool centerSelectors;
+  final String? selectedCorp;
+  final ValueChanged<String?>? onCorpChanged;
+  final String? selectedTrip;
+  final ValueChanged<String?>? onTripChanged;
+  final AutovalidateMode selectorAutovalidateMode;
 
   @override
   Widget build(BuildContext context) {
@@ -383,12 +426,19 @@ class RooAppHeader extends StatelessWidget {
             Expanded(
               child: Row(
                 children: [
-                  Expanded(child: _SelectorChip(label: 'CORP SELECTION', value: 'AECS')),
+                  Expanded(
+                    child: _CorpSelectorField(
+                      value: selectedCorp,
+                      onChanged: onCorpChanged,
+                      autovalidateMode: selectorAutovalidateMode,
+                    ),
+                  ),
                   const SizedBox(width: RooSpacing.xs),
                   Expanded(
-                    child: _SelectorChip(
-                      label: 'TRIP SELECTION',
-                      value: 'Pickup - 8:30',
+                    child: _TripSelectorField(
+                      value: selectedTrip,
+                      onChanged: onTripChanged,
+                      autovalidateMode: selectorAutovalidateMode,
                     ),
                   ),
                 ],
@@ -460,16 +510,28 @@ class RooAppHeader extends StatelessWidget {
   }
 }
 
-class _SelectorChip extends StatelessWidget {
-  const _SelectorChip({required this.label, required this.value});
+/// Corp dropdown chip (uses [DropdownButtonFormField]).
+class _CorpSelectorField extends StatelessWidget {
+  const _CorpSelectorField({
+    required this.value,
+    required this.onChanged,
+    this.autovalidateMode = AutovalidateMode.disabled,
+  });
 
-  final String label;
-  final String value;
+  final String? value;
+  final ValueChanged<String?>? onChanged;
+  final AutovalidateMode autovalidateMode;
+
+  static final _valueStyle = GoogleFonts.inter(
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    color: RooColors.primaryDark,
+  );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -483,9 +545,10 @@ class _SelectorChip extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            label,
+            'CORP SELECTION',
             style: GoogleFonts.inter(
               fontSize: 9,
               fontWeight: FontWeight.w600,
@@ -493,21 +556,151 @@ class _SelectorChip extends StatelessWidget {
               color: RooColors.labelGrey,
             ),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: RooColors.primaryDark,
+          DropdownButtonFormField<String>(
+            initialValue: value,
+            autovalidateMode: autovalidateMode,
+            isExpanded: true,
+            isDense: true,
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+              color: RooColors.primaryDark,
+            ),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+              errorStyle: TextStyle(fontSize: 9, height: 1.2),
+            ),
+            hint: Text('Select', style: _valueStyle.copyWith(color: RooColors.labelGrey)),
+            style: _valueStyle,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            validator: (corp) =>
+                corp == null || corp.isEmpty ? RooCorps.validationMessage : null,
+            items: RooCorps.names
+                .map(
+                  (corp) => DropdownMenuItem<String>(
+                    value: corp,
+                    child: Text(corp, style: _valueStyle),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const Icon(Icons.keyboard_arrow_down, size: 18, color: RooColors.primaryDark),
-            ],
+                )
+                .toList(),
+            selectedItemBuilder: (context) => RooCorps.names
+                .map((corp) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        corp,
+                        style: _valueStyle,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ))
+                .toList(),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Trip dropdown chip (uses [DropdownButtonFormField]).
+class _TripSelectorField extends StatelessWidget {
+  const _TripSelectorField({
+    required this.value,
+    required this.onChanged,
+    this.autovalidateMode = AutovalidateMode.disabled,
+  });
+
+  final String? value;
+  final ValueChanged<String?>? onChanged;
+  final AutovalidateMode autovalidateMode;
+
+  static final _valueStyle = GoogleFonts.inter(
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    color: RooColors.primaryDark,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'TRIP SELECTION',
+            style: GoogleFonts.inter(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: RooColors.labelGrey,
+            ),
+          ),
+          DropdownButtonFormField<String>(
+            initialValue: value,
+            autovalidateMode: autovalidateMode,
+            isExpanded: true,
+            isDense: true,
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+              color: RooColors.primaryDark,
+            ),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
+              contentPadding: EdgeInsets.zero,
+              isDense: true,
+              errorStyle: TextStyle(fontSize: 9, height: 1.2),
+            ),
+            hint: Text('Select', style: _valueStyle.copyWith(color: RooColors.labelGrey)),
+            style: _valueStyle,
+            dropdownColor: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            validator: (trip) =>
+                trip == null || trip.isEmpty ? RooTrips.validationMessage : null,
+            items: RooTrips.names
+                .map(
+                  (trip) => DropdownMenuItem<String>(
+                    value: trip,
+                    child: Text(trip, style: _valueStyle),
+                  ),
+                )
+                .toList(),
+            selectedItemBuilder: (context) => RooTrips.names
+                .map(
+                  (trip) => Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      trip,
+                      style: _valueStyle,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: onChanged,
           ),
         ],
       ),
@@ -793,20 +986,78 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  String? _selectedCorp = RooCorps.names.first;
+  String? _selectedTrip = RooTrips.names.first;
+  bool _selectorValidateOnNav = false;
+  final _dashboardFormKey = GlobalKey<FormState>();
 
-  static const _pages = [
-    DashboardScreen(),
-    TrackingScreen(),
-    ProfileScreen(),
-  ];
+  String _selectionValidationMessage() {
+    if (_selectedCorp == null || _selectedCorp!.isEmpty) {
+      return RooCorps.validationMessage;
+    }
+    if (_selectedTrip == null || _selectedTrip!.isEmpty) {
+      return RooTrips.validationMessage;
+    }
+    return RooTrips.validationMessage;
+  }
+
+  void _onBottomNavTap(int index) {
+    if (index == _index) return;
+
+    if (index != 0) {
+      setState(() => _selectorValidateOnNav = true);
+      final formValid = _dashboardFormKey.currentState?.validate() ?? false;
+      if (!formValid ||
+          _selectedCorp == null ||
+          _selectedCorp!.isEmpty ||
+          _selectedTrip == null ||
+          _selectedTrip!.isEmpty) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                _selectionValidationMessage(),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        return;
+      }
+    }
+
+    setState(() => _index = index);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final autovalidateMode = _selectorValidateOnNav
+        ? AutovalidateMode.onUserInteraction
+        : AutovalidateMode.disabled;
+
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
+      body: IndexedStack(
+        index: _index,
+        children: [
+          DashboardScreen(
+            dashboardFormKey: _dashboardFormKey,
+            selectedCorp: _selectedCorp,
+            onCorpChanged: (corp) => setState(() => _selectedCorp = corp),
+            selectedTrip: _selectedTrip,
+            onTripChanged: (trip) => setState(() => _selectedTrip = trip),
+            selectorAutovalidateMode: autovalidateMode,
+          ),
+          TrackingScreen(
+            selectedCorp: _selectedCorp,
+            selectedTrip: _selectedTrip,
+          ),
+          const ProfileScreen(),
+        ],
+      ),
       bottomNavigationBar: RooBottomNavBar(
         currentIndex: _index,
-        onTap: (i) => setState(() => _index = i),
+        onTap: _onBottomNavTap,
       ),
     );
   }
@@ -817,7 +1068,22 @@ class _MainShellState extends State<MainShell> {
 // ---------------------------------------------------------------------------
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+    required this.dashboardFormKey,
+    required this.selectedCorp,
+    required this.onCorpChanged,
+    required this.selectedTrip,
+    required this.onTripChanged,
+    this.selectorAutovalidateMode = AutovalidateMode.disabled,
+  });
+
+  final GlobalKey<FormState> dashboardFormKey;
+  final String? selectedCorp;
+  final ValueChanged<String?> onCorpChanged;
+  final String? selectedTrip;
+  final ValueChanged<String?> onTripChanged;
+  final AutovalidateMode selectorAutovalidateMode;
 
   @override
   Widget build(BuildContext context) {
@@ -831,7 +1097,18 @@ class DashboardScreen extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.only(top: pad.top),
-              child: const RooAppHeader(centerSelectors: true),
+              child: Form(
+                key: dashboardFormKey,
+                autovalidateMode: selectorAutovalidateMode,
+                child: RooAppHeader(
+                  centerSelectors: true,
+                  selectedCorp: selectedCorp,
+                  onCorpChanged: onCorpChanged,
+                  selectedTrip: selectedTrip,
+                  onTripChanged: onTripChanged,
+                  selectorAutovalidateMode: selectorAutovalidateMode,
+                ),
+              ),
             ),
           ),
           SliverPadding(
@@ -1182,7 +1459,10 @@ class _LegendRow extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class TrackingScreen extends StatelessWidget {
-  const TrackingScreen({super.key});
+  const TrackingScreen({super.key, this.selectedCorp, this.selectedTrip});
+
+  final String? selectedCorp;
+  final String? selectedTrip;
 
   @override
   Widget build(BuildContext context) {
@@ -1193,16 +1473,86 @@ class TrackingScreen extends StatelessWidget {
           const Positioned.fill(child: _MockMap()),
           Column(
             children: [
-              Container(
+              ColoredBox(
                 color: Colors.white,
                 child: SafeArea(
                   bottom: false,
-                  child: const RooAppHeader(showSearch: true, notificationDot: true),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const RooAppHeader(showSearch: true, notificationDot: true),
+                      if (selectedCorp != null)
+                        _SelectionBanner(
+                          label: 'Selected Corp',
+                          value: selectedCorp!,
+                          icon: Icons.business_outlined,
+                        ),
+                      if (selectedTrip != null)
+                        _SelectionBanner(
+                          label: 'Selected Trip',
+                          value: selectedTrip!,
+                          icon: Icons.route_outlined,
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const Spacer(),
               const _VehicleSelectionSheet(),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectionBanner extends StatelessWidget {
+  const _SelectionBanner({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(
+        RooSpacing.md,
+        0,
+        RooSpacing.md,
+        RooSpacing.sm,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: RooSpacing.md, vertical: 10),
+      decoration: BoxDecoration(
+        color: RooColors.contactCardBg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: RooColors.primary),
+          const SizedBox(width: RooSpacing.sm),
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 12, color: RooColors.labelGrey),
+          ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: RooColors.primaryDark,
+              ),
+            ),
           ),
         ],
       ),
@@ -1559,7 +1909,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SliverToBoxAdapter(
             child: SafeArea(
               bottom: false,
-              child: const RooAppHeader(showTruckTitle: true),
+              child: const RooAppHeader(),
             ),
           ),
           SliverPadding(
